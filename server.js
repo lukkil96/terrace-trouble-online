@@ -148,13 +148,13 @@ function bcast(obj,except){
     if(p.ws.readyState===WebSocket.OPEN&&p.ws!==except)p.ws.send(s);
 }
 function lobbyState(){
-  return {t:'lobby',host:hostId,players:[...players.values()].filter(q=>q.joined).map(q=>({id:q.id,name:q.name}))};
+  return {t:'lobby',host:hostId,players:[...players.values()].filter(q=>q.joined).map(q=>({id:q.id,name:q.name,col:q.col}))};
 }
 function newRound(){
   const fresh=[...waiters.values()]; /* tunnel empties at kick-off */
   for(const w of fresh)players.set(w.id,w);
   waiters.clear();
-  for(const w of fresh)bcast({t:'pjoin',id:w.id,name:w.name,phrase:w.phrase},w.ws);
+  for(const w of fresh)bcast({t:'pjoin',id:w.id,name:w.name,phrase:w.phrase,col:w.col},w.ws);
   if(hostId===null&&players.size)hostId=players.values().next().value.id;
   for(const q of players.values()){q.dmg=0;q.fans=0;q.kos=0;}
   lastHit.clear();jazzOwner=null;gone.clear();
@@ -285,7 +285,7 @@ const wss=new WebSocket.Server({server});
 wss.on('connection',ws=>{
   if(players.size+waiters.size>=MAX_PLAYERS){ws.send(JSON.stringify({t:'full'}));ws.close();return;}
   const id=nextId++;
-  const p={ws,id,name:'FAN '+id,phrase:'HAVE THAT!',joined:false,x:25,z:34,yaw:Math.PI*0.75,down:0,drag:0,w:0,dmg:0,fans:0,kos:0};
+  const p={ws,id,name:'FAN '+id,phrase:'HAVE THAT!',joined:false,col:0,x:25,z:34,yaw:Math.PI*0.75,down:0,drag:0,w:0,dmg:0,fans:0,kos:0};
   if(phase==='playing'){ /* round locked: hold them in the tunnel until next kick-off */
     waiters.set(id,p);
     ws.send(JSON.stringify({t:'welcome',id,phase:'waiting',host:hostId,seed:roundSeed}));
@@ -296,20 +296,24 @@ wss.on('connection',ws=>{
       t:'welcome',id,phase,host:hostId,seed:roundSeed,tick,rt:roundTick,
       stag:stagIndex>=0?{idx:stagIndex,x:C.x[stagIndex],z:C.z[stagIndex],hits:stagHits}:null,
       due:Math.max(0,stagDue-Date.now()),
-      players:[...players.values()].filter(q=>q!==p&&q.joined).map(q=>({id:q.id,name:q.name,phrase:q.phrase,x:q.x,z:q.z,yaw:q.yaw,down:q.down,drag:q.drag})),
+      players:[...players.values()].filter(q=>q!==p&&q.joined).map(q=>({id:q.id,name:q.name,phrase:q.phrase,col:q.col,x:q.x,z:q.z,yaw:q.yaw,down:q.down,drag:q.drag})),
     }));
   }
   ws.on('message',raw=>{
     let m;try{m=JSON.parse(raw);}catch(e){return;}
-    if(m.t!=='join'&&m.t!=='start'&&!players.has(id))return; /* waiters only get to introduce themselves */
+    if(m.t!=='join'&&m.t!=='start'&&m.t!=='col'&&!players.has(id))return; /* waiters: introductions and kit only */
     if(m.t==='join'){
       p.name=String(m.name||'FAN '+id).slice(0,12);
       p.phrase=String(m.phrase||'HAVE THAT!').slice(0,16).toUpperCase();
+      p.col=Math.max(0,Math.min(7,m.col|0));
       p.joined=true;
       if(players.has(id)){
-        bcast({t:'pjoin',id,name:p.name,phrase:p.phrase},ws);
+        bcast({t:'pjoin',id,name:p.name,phrase:p.phrase,col:p.col},ws);
         if(phase==='lobby')bcast(lobbyState());
       }
+    }else if(m.t==='col'){
+      p.col=Math.max(0,Math.min(7,m.col|0));
+      if(phase==='lobby'&&players.has(id))bcast(lobbyState());
     }else if(m.t==='start'){
       if(phase==='lobby'&&id===hostId){phase='playing';newRound();console.log('host',p.name,'kicked off');}
     }else if(m.t==='state'){
@@ -378,7 +382,7 @@ setInterval(()=>{ /* snapshots 10Hz */
   bcast({t:'snap',tick,
     stag:stagIndex>=0?{idx:stagIndex,x:+C.x[stagIndex].toFixed(2),z:+C.z[stagIndex].toFixed(2),f:stagFleeing?1:0,hits:stagHits}:null,
     gone:[...gone],
-    players:[...players.values()].filter(q=>q.joined).map(q=>({id:q.id,name:q.name,phrase:q.phrase,x:+q.x.toFixed(2),z:+q.z.toFixed(2),yaw:+q.yaw.toFixed(2),down:q.down,drag:q.drag,w:q.w})),
+    players:[...players.values()].filter(q=>q.joined).map(q=>({id:q.id,name:q.name,phrase:q.phrase,col:q.col,x:+q.x.toFixed(2),z:+q.z.toFixed(2),yaw:+q.yaw.toFixed(2),down:q.down,drag:q.drag,w:q.w})),
   });
 },100);
 

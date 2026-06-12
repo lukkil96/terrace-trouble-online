@@ -74,6 +74,9 @@
   .small{font-size:10px;color:rgba(242,239,230,.45);margin-top:14px;letter-spacing:1px;line-height:1.7;}
   #win{display:none;}
   #winTime{color:var(--stag);font-size:26px;font-family:Georgia,serif;}
+  .kitSwatch{width:30px;height:30px;border-radius:50%;border:2px solid rgba(242,239,230,.25);
+    margin:2px 4px;padding:0;cursor:pointer;vertical-align:middle;}
+  .kitSwatch.sel{border-color:#ffd76a;box-shadow:0 0 8px rgba(255,215,106,.6);}
 </style>
 </head>
 <body>
@@ -147,6 +150,8 @@
     <h1>IN THE <span class="pink">TUNNEL</span></h1>
     <h2 id="lobbyCount">1 in the ground</h2>
     <div id="lobbyList" style="font-size:13px;line-height:2.1;letter-spacing:1px;color:#d8d4c8;margin-bottom:6px;"></div>
+    <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#cbb6a0;margin-top:8px;">Your top</div>
+    <div id="kitRow" style="margin:6px 0 2px;"></div>
     <button id="lobbyStartBtn" type="button" style="display:none;">Kick it off</button>
     <p class="small" id="lobbyNote">Share the link with your mates — they'll appear here as they join.</p>
   </div>
@@ -1454,19 +1459,23 @@ function statsHTML(){
 
 /* the player — you, in a club hoodie with your name on the back, a head taller than the punters */
 let playerName='YOU';
-function hoodieTexture(name){
+const KIT_COLS=['#7e1d1f','#1d3a6e','#2e6b34','#caa53d','#c4641d','#5b2d77','#e8e4da','#1c1c20'];
+const KIT_LIGHT=[false,false,false,true,false,false,true,false]; /* light tops take dark print */
+let myCol=parseInt(localStorage.getItem('ttKitCol')||'0',10);
+if(!(myCol>=0&&myCol<KIT_COLS.length))myCol=0;
+function hoodieTexture(name,ci){
   const c=document.createElement('canvas');c.width=256;c.height=256;
   const x=c.getContext('2d');
-  x.fillStyle='#7e1d1f';x.fillRect(0,0,256,256);
+  x.fillStyle=KIT_COLS[ci|0]||KIT_COLS[0];x.fillRect(0,0,256,256);
   // fabric weave
   for(let i=0;i<1400;i++){x.fillStyle='rgba(0,0,0,.07)';x.fillRect(Math.random()*256,Math.random()*256,2,1);}
   return new THREE.CanvasTexture(c);
 }
-function namePlate(name){
+function namePlate(name,ci){
   const c=document.createElement('canvas');c.width=256;c.height=96;
   const x=c.getContext('2d');
   x.clearRect(0,0,256,96);
-  x.fillStyle='#ece8de';x.font='bold 40px Georgia';x.textAlign='center';x.textBaseline='middle';
+  x.fillStyle=KIT_LIGHT[ci|0]?'#1d1d1d':'#ece8de';x.font='bold 40px Georgia';x.textAlign='center';x.textBaseline='middle';
   const txt=name.toUpperCase().slice(0,10);
   x.fillText(txt,128,48);
   return new THREE.CanvasTexture(c);
@@ -1484,7 +1493,7 @@ function nameTag(name){
 let playerMesh=null,playerBackPlate=null,playerTag=null,playerBar=null;
 function buildPlayer(name){
   if(playerMesh)scene.remove(playerMesh);
-  const hoodMat=new THREE.MeshStandardMaterial({map:hoodieTexture(name),roughness:.95});
+  const hoodMat=new THREE.MeshStandardMaterial({map:hoodieTexture(name,myCol),roughness:.95});
   playerMesh=buildCharacter({shirtMat:hoodMat,hair:0x17120d,shorts:0x2c2c30,trousers:0x2c2c30});
   // hood resting on the shoulders
   const hood=sh(new THREE.Mesh(new THREE.SphereGeometry(.2,8,6,0,Math.PI*2,0,1.6),hoodMat));
@@ -1494,7 +1503,7 @@ function buildPlayer(name){
   pocket.position.set(0,0.92,0.34);playerMesh.add(pocket);
   // name printed across the back (local -z faces the camera in third person)
   playerBackPlate=new THREE.Mesh(new THREE.PlaneGeometry(.66,.25),
-    new THREE.MeshBasicMaterial({map:namePlate(name),transparent:true}));
+    new THREE.MeshBasicMaterial({map:namePlate(name,myCol),transparent:true}));
   playerBackPlate.position.set(0,1.38,-0.385);playerBackPlate.rotation.y=Math.PI;
   playerMesh.add(playerBackPlate);
   // floating username tag + health bar (full strength on a matchday)
@@ -2070,8 +2079,10 @@ function renderWaiting(){
   document.getElementById('lobbyStartBtn').style.display='none';
   document.getElementById('lobbyNote').textContent='Hold tight — rounds last five minutes at most.';
 }
+const escHtml=s=>String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 function renderLobby(list,host){
-  const names=list.map(q=>(q.id===host?'🧢 ':'')+q.name+(q.id===net.id?' (you)':''));
+  const names=list.map(q=>'<span style="color:'+(KIT_COLS[q.col|0]||KIT_COLS[0])+';text-shadow:0 0 3px rgba(255,255,255,.25);">●</span> '
+    +(q.id===host?'🧢 ':'')+escHtml(q.name)+(q.id===net.id?' (you)':''));
   document.getElementById('lobbyCount').textContent=list.length+(list.length===1?' in the ground':' in the ground');
   document.getElementById('lobbyList').innerHTML=names.join('<br>');
   const meHost=host===net.id;
@@ -2082,19 +2093,20 @@ function renderLobby(list,host){
     :'Waiting for '+(hostP?hostP.name:'the gaffer')+' to kick it off…';
 }
 const remotes=new Map(); // id -> remote player rig
-function makeRemote(name){
-  const hoodMat=new THREE.MeshStandardMaterial({map:hoodieTexture(name),roughness:.95});
+function makeRemote(name,ci){
+  ci=ci|0;
+  const hoodMat=new THREE.MeshStandardMaterial({map:hoodieTexture(name,ci),roughness:.95});
   const mesh=buildCharacter({shirtMat:hoodMat,hair:0x17120d,shorts:0x2c2c30,trousers:0x2c2c30});
   const hood=sh(new THREE.Mesh(new THREE.SphereGeometry(.2,8,6,0,Math.PI*2,0,1.6),hoodMat));
   hood.position.set(0,1.62,-0.22);hood.scale.set(1.25,0.7,0.9);mesh.add(hood);
   const plate=new THREE.Mesh(new THREE.PlaneGeometry(.66,.25),
-    new THREE.MeshBasicMaterial({map:namePlate(name),transparent:true}));
+    new THREE.MeshBasicMaterial({map:namePlate(name,ci),transparent:true}));
   plate.position.set(0,1.38,-0.385);plate.rotation.y=Math.PI;mesh.add(plate);
   const tag=nameTag(name);mesh.add(tag);
   const bar=makeBar('#4cae50');bar.position.y=2.32;mesh.add(bar);drawBar(bar,1);
   mesh.scale.set(1.14,1.14,1.14);
   scene.add(mesh);
-  return {mesh,name,x:25,z:34,tx:25,tz:34,yaw:0,tyaw:0,down:0,drag:0,punchT:0,walk:0,phrase:'HAVE THAT!',w:0,wMesh:null,jazz:null};
+  return {mesh,name,col:ci,x:25,z:34,tx:25,tz:34,yaw:0,tyaw:0,down:0,drag:0,punchT:0,walk:0,phrase:'HAVE THAT!',w:0,wMesh:null,jazz:null};
 }
 function netHandle(m){
   if(m.t==='welcome'){
@@ -2104,7 +2116,7 @@ function netHandle(m){
     me.x=sp[0];me.z=sp[1];me.yaw=Math.atan2(me.x,me.z); // face the pitch
     if(m.gone)m.gone.forEach(gi=>{goneF[gi]=1;goneX[gi]=C.x[gi];goneZ[gi]=C.z[gi];downT[gi]=9;});
     snapTick=m.tick;snapTime=performance.now();
-    if(m.players)m.players.forEach(q=>{const r=makeRemote(q.name);Object.assign(r,{x:q.x,z:q.z,tx:q.x,tz:q.z,yaw:q.yaw,tyaw:q.yaw,phrase:q.phrase});remotes.set(q.id,r);});
+    if(m.players)m.players.forEach(q=>{const r=makeRemote(q.name,q.col);Object.assign(r,{x:q.x,z:q.z,tx:q.x,tz:q.z,yaw:q.yaw,tyaw:q.yaw,phrase:q.phrase});remotes.set(q.id,r);});
     net.host=m.host||0;
     if(m.phase==='lobby'){net.inLobby=true;} /* hold in the tunnel until the host starts */
     else if(m.phase==='waiting'){net.inLobby=true;net.waiting=true;} /* match running: on at next kick-off */
@@ -2115,7 +2127,13 @@ function netHandle(m){
     m.players.forEach(q=>{
       if(q.id===net.id)return;
       let r=remotes.get(q.id);
-      if(!r){r=makeRemote(q.name);remotes.set(q.id,r);}
+      if(r&&r.col!==(q.col|0)){ /* changed kit in the lobby: rebuild with the new colours */
+        scene.remove(r.mesh);if(r.jazz)scene.remove(r.jazz);
+        const nr=makeRemote(q.name,q.col);
+        Object.assign(nr,{x:r.x,z:r.z,tx:r.tx,tz:r.tz,yaw:r.yaw,tyaw:r.tyaw,phrase:r.phrase});
+        remotes.set(q.id,nr);r=nr;
+      }
+      if(!r){r=makeRemote(q.name,q.col);remotes.set(q.id,r);}
       r.tx=q.x;r.tz=q.z;r.tyaw=q.yaw;r.down=q.down;r.drag=q.drag;r.phrase=q.phrase;
       const qw=q.w|0;
       if(qw!==r.w){
@@ -2133,11 +2151,11 @@ function netHandle(m){
     });
   }else if(m.t==='pjoin'){
     const old=remotes.get(m.id);
-    if(old&&old.name!==m.name){ /* model was built before their real name arrived: rebuild */
+    if(old&&(old.name!==m.name||old.col!==(m.col|0))){ /* built before real name/kit arrived: rebuild */
       scene.remove(old.mesh);if(old.jazz)scene.remove(old.jazz);remotes.delete(m.id);
     }
     if(!remotes.has(m.id)){
-      const nr=makeRemote(m.name);
+      const nr=makeRemote(m.name,m.col);
       if(old)Object.assign(nr,{x:old.x,z:old.z,tx:old.tx,tz:old.tz,yaw:old.yaw,tyaw:old.tyaw});
       nr.phrase=m.phrase||nr.phrase;
       remotes.set(m.id,nr);
@@ -2209,7 +2227,7 @@ function connectOnline(name,phrase,onFail){
   const url=(location.protocol==='https:'?'wss://':'ws://')+location.host;
   try{
     net.ws=new WebSocket(url);
-    net.ws.onopen=()=>net.send({t:'join',name,phrase});
+    net.ws.onopen=()=>net.send({t:'join',name,phrase,col:myCol});
     net.ws.onmessage=e=>{try{netHandle(JSON.parse(e.data));}catch(err){}};
     net.ws.onerror=()=>{if(!net.ready)onFail();};
     net.ws.onclose=()=>{if(running)say('Connection lost — the tannoy has gone quiet.');};
@@ -3387,6 +3405,21 @@ document.getElementById('lobbyStartBtn').addEventListener('click',()=>{
   net.send({t:'start'});
   document.getElementById('lobbyNote').textContent='Right then. Out of the tunnel…';
 });
+{ /* kit colour swatches in the tunnel */
+  const kr=document.getElementById('kitRow');
+  KIT_COLS.forEach((c,i)=>{
+    const b=document.createElement('button');
+    b.type='button';b.className='kitSwatch'+(i===myCol?' sel':'');
+    b.style.background=c;b.title='Pick this top';
+    b.addEventListener('click',()=>{
+      myCol=i;localStorage.setItem('ttKitCol',String(i));
+      [...kr.children].forEach((el,j)=>el.classList.toggle('sel',j===i));
+      net.send({t:'col',col:i});
+      if(playerMesh)buildPlayer(playerName); /* re-stitch my own hoodie on the spot */
+    });
+    kr.appendChild(b);
+  });
+}
 document.getElementById('loseBtn').addEventListener('click',()=>{
   if(MODE==='online'){net.send({t:'next'});say('Calling for the next round...');return;}
   document.getElementById('lose').style.display='none';
