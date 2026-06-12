@@ -20,7 +20,7 @@ const ROUND_MS=parseInt(process.env.ROUND_MS||'300000',10);
 const FLEE=5.6,STAG_WANDER=1.15;
 
 /* ---------- static ---------- */
-const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css'};
+const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.mp3':'audio/mpeg','.wav':'audio/wav'};
 const server=http.createServer((req,res)=>{
   let file=req.url==='/'?'/index.html':req.url.split('?')[0];
   const fp=path.join(__dirname,'public',path.normalize(file).replace(/^(\.\.[\/\\])+/,''));
