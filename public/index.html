@@ -18,7 +18,10 @@
   #punchBtn{right:5vw;bottom:6vh;width:24vw;max-width:120px;height:24vw;max-height:120px;font-size:14px;font-weight:bold;}
   #sprintBtn{right:7vw;bottom:calc(6vh + min(24vw,120px) + 14px);width:20vw;max-width:100px;height:20vw;max-height:100px;font-size:12px;font-weight:bold;background:rgba(64,98,60,.55);}
   @media (max-width:700px){
-    #topbar{gap:10px;padding:6px 8px;transform:translateX(-50%) scale(.82);transform-origin:top center;}
+    #topbar{gap:6px 10px;padding:5px 8px;}
+    .stat{font-size:8px;letter-spacing:1px;}
+    .stat b{font-size:13px;}
+    .statbar{width:54px;height:9px;margin-top:3px;}
     .card{padding:22px 18px;max-width:92vw;}
     #controlsHint{display:none;}
   }
@@ -27,7 +30,10 @@
     #punchBtn{width:18vw;max-width:94px;height:18vw;max-height:94px;font-size:11px;}
     #sprintBtn{width:15vw;max-width:78px;height:15vw;max-height:78px;font-size:10px;bottom:calc(6vh + min(18vw,94px) + 12px);}
     #shopBtn{top:max(8px,env(safe-area-inset-top))!important;right:max(10px,env(safe-area-inset-right))!important;padding:10px 15px!important;font-size:13px!important;}
-    #topbar{transform:translateX(-50%) scale(.74);transform-origin:top center;}
+    #topbar{gap:6px 10px;padding:5px 8px;top:max(8px,env(safe-area-inset-top));}
+    .stat{font-size:8px;letter-spacing:1px;}
+    .stat b{font-size:13px;}
+    .statbar{width:54px;height:9px;margin-top:3px;}
     .card{max-width:min(540px,92vw);max-height:88vh;overflow-y:auto;padding:clamp(14px,4vw,32px) clamp(14px,4vw,36px);}
     .card h1{font-size:24px;}
   }
@@ -37,7 +43,9 @@
   #hud{position:fixed;inset:0;pointer-events:none;z-index:10;display:none;}
   #topbar{position:absolute;top:12px;left:50%;transform:translateX(-50%);
     display:flex;gap:22px;align-items:center;background:rgba(12,14,12,.62);
-    border:1px solid rgba(242,239,230,.18);border-radius:4px;padding:8px 16px;backdrop-filter:blur(6px);}
+    border:1px solid rgba(242,239,230,.18);border-radius:4px;padding:8px 16px;backdrop-filter:blur(6px);
+    max-width:96vw;flex-wrap:wrap;justify-content:center;row-gap:6px;}
+  .statbar{width:104px;height:11px;background:#23241f;border:1px solid #4a4a44;border-radius:6px;overflow:hidden;margin-top:5px;}
   .stat{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#b9b5a8;}
   .stat b{display:block;font-size:18px;color:#fff;margin-top:2px;font-family:Georgia,serif;font-weight:600;}
   .stat b.stag{color:var(--stag);}
@@ -99,10 +107,10 @@
     <div class="stat">🐓<b class="stag" id="staghp">—</b></div>
     <div class="stat">This hunt<b id="timer">0:00</b></div>
     <div class="stat">Best full-time<b id="best">—</b></div>
-    <div class="stat">HP<div style="width:104px;height:11px;background:#23241f;border:1px solid #4a4a44;border-radius:6px;overflow:hidden;margin-top:5px;"><div id="hpbar" style="height:100%;width:100%;background:linear-gradient(90deg,#3f9143,#7ed884);border-radius:5px;transition:width .15s;"></div></div></div>
+    <div class="stat">HP<div class="statbar"><div id="hpbar" style="height:100%;width:100%;background:linear-gradient(90deg,#3f9143,#7ed884);border-radius:5px;transition:width .15s;"></div></div></div>
     <div class="stat">Lives <b id="livesEl" style="color:#ff8a8a;">❤❤</b></div>
     <div class="stat">🪙<b id="coinsEl" style="color:#ffd76a;">0</b></div>
-    <div class="stat">Puff<div style="width:104px;height:11px;background:#23241f;border:1px solid #4a4a44;border-radius:6px;overflow:hidden;margin-top:5px;"><div id="stbar" style="height:100%;width:100%;background:linear-gradient(90deg,#b98a2c,#f0cb5e);border-radius:5px;transition:width .1s;"></div></div></div>
+    <div class="stat">Puff<div class="statbar"><div id="stbar" style="height:100%;width:100%;background:linear-gradient(90deg,#b98a2c,#f0cb5e);border-radius:5px;transition:width .1s;"></div></div></div>
   </div>
   <div id="msg"></div>
   <div id="controlsHint">WASD / Arrows move · Tap Space jab · HOLD Space haymaker · Shift leg it · Mind the stewards</div>
@@ -128,6 +136,17 @@
     </div>
     <div id="netNote" class="small" style="display:none;">Connecting to Meadowbank...</div>
     <div class="small">Cartoon fisticuffs · sound on for the full matchday · bystanders only stagger.</div>
+  </div>
+</div>
+
+<div class="overlay" id="lobby" style="display:none;z-index:25;">
+  <div class="card">
+    <div class="crest"></div>
+    <h1>IN THE <span class="pink">TUNNEL</span></h1>
+    <h2 id="lobbyCount">1 in the ground</h2>
+    <div id="lobbyList" style="font-size:13px;line-height:2.1;letter-spacing:1px;color:#d8d4c8;margin-bottom:6px;"></div>
+    <button id="lobbyStartBtn" type="button" style="display:none;">Kick it off</button>
+    <p class="small" id="lobbyNote">Share the link with your mates — they'll appear here as they join.</p>
   </div>
 </div>
 
@@ -2041,8 +2060,19 @@ let beaconT=0,beaconNext=0;
 
 /* ============ mode + network ============ */
 let MODE='solo';
-const net={ws:null,id:0,seed:(Math.random()*0xffffffff)>>>0,rt:0,ready:false,
+const net={ws:null,id:0,seed:(Math.random()*0xffffffff)>>>0,rt:0,ready:false,host:0,inLobby:false,
   send(o){if(MODE==='online'&&this.ws&&this.ws.readyState===1)this.ws.send(JSON.stringify(o));}};
+function renderLobby(list,host){
+  const names=list.map(q=>(q.id===host?'🧢 ':'')+q.name+(q.id===net.id?' (you)':''));
+  document.getElementById('lobbyCount').textContent=list.length+(list.length===1?' in the ground':' in the ground');
+  document.getElementById('lobbyList').innerHTML=names.join('<br>');
+  const meHost=host===net.id;
+  document.getElementById('lobbyStartBtn').style.display=meHost?'inline-block':'none';
+  const hostP=list.find(q=>q.id===host);
+  document.getElementById('lobbyNote').textContent=meHost
+    ?'You’ve got the gaffer’s cap — kick it off when your mates are in. Share the link!'
+    :'Waiting for '+(hostP?hostP.name:'the gaffer')+' to kick it off…';
+}
 const remotes=new Map(); // id -> remote player rig
 function makeRemote(name){
   const hoodMat=new THREE.MeshStandardMaterial({map:hoodieTexture(name),roughness:.95});
@@ -2067,7 +2097,9 @@ function netHandle(m){
     if(m.gone)m.gone.forEach(gi=>{goneF[gi]=1;goneX[gi]=C.x[gi];goneZ[gi]=C.z[gi];downT[gi]=9;});
     snapTick=m.tick;snapTime=performance.now();
     if(m.players)m.players.forEach(q=>{const r=makeRemote(q.name);Object.assign(r,{x:q.x,z:q.z,tx:q.x,tz:q.z,yaw:q.yaw,tyaw:q.yaw,phrase:q.phrase});remotes.set(q.id,r);});
-    beginMatch(m.due!=null?m.due:60000,m.stag);
+    net.host=m.host||0;
+    if(m.phase==='lobby'){net.inLobby=true;} /* hold in the tunnel until the host starts */
+    else beginMatch(m.due!=null?m.due:60000,m.stag);
   }else if(m.t==='snap'){
     snapTick=m.tick;snapTime=performance.now();
     if(m.stag&&stagIndex>=0){stagNet.x=m.stag.x;stagNet.z=m.stag.z;stagFleeing=!!m.stag.f;}
@@ -2096,8 +2128,18 @@ function netHandle(m){
   }else if(m.t==='pleave'){
     const r=remotes.get(m.id);
     if(r){scene.remove(r.mesh);if(r.jazz)scene.remove(r.jazz);remotes.delete(m.id);}
+  }else if(m.t==='lobby'){
+    net.lobbyRoster=m.players||[];net.host=m.host||0;
+    if(net.inLobby)renderLobby(net.lobbyRoster,net.host);
   }else if(m.t==='round'){
     net.seed=m.seed;net.rt=m.rt||0;
+    if(net.inLobby){ /* host kicked off: leave the tunnel and run the full kick-off cutscene */
+      net.inLobby=false;
+      document.getElementById('lobby').style.display='none';
+      hud.style.display='block';
+      beginMatch(m.due!=null?m.due:60000,null);
+      return;
+    }
     document.getElementById('win').style.display='none';
     document.getElementById('lose').style.display='none';
     clientChaos(net.seed,net.rt);
@@ -3309,14 +3351,21 @@ document.getElementById('onlineBtn').addEventListener('click',()=>{
       skipBtn.style.display='block';
     },1200);
   });
-  // welcome -> beginMatch starts the cutscene
+  // welcome -> lobby (host kicks off) or straight into the running match
   const iv=setInterval(()=>{
     if(net.ready){
       clearInterval(iv);
       document.getElementById('intro').style.display='none';
-      hud.style.display='block';
+      if(net.inLobby){
+        document.getElementById('lobby').style.display='flex';
+        renderLobby(net.lobbyRoster||[{id:net.id,name:playerName}],net.host);
+      }else hud.style.display='block';
     }
   },120);
+});
+document.getElementById('lobbyStartBtn').addEventListener('click',()=>{
+  net.send({t:'start'});
+  document.getElementById('lobbyNote').textContent='Right then. Out of the tunnel…';
 });
 document.getElementById('loseBtn').addEventListener('click',()=>{
   if(MODE==='online'){net.send({t:'next'});say('Calling for the next round...');return;}

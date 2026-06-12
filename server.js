@@ -135,8 +135,9 @@ function crowdStep(){
 /* ---------- game state ---------- */
 let tick=0,roundTick=0;
 let roundSeed=0;
-let stagIndex=-1,stagHits=0,stagDue=0,roundEnd=Infinity,stagFleeing=false;
+let stagIndex=-1,stagHits=0,stagDue=Infinity,roundEnd=Infinity,stagFleeing=false;
 let stagPunchT=0,roundOver=false;
+let phase='lobby',hostId=null; /* server waits in the tunnel until the host kicks off */
 const players=new Map(); /* id -> {ws,name,phrase,x,z,yaw,down,drag,alive} */
 let nextId=1;
 
@@ -144,6 +145,9 @@ function bcast(obj,except){
   const s=JSON.stringify(obj);
   for(const p of players.values())
     if(p.ws.readyState===WebSocket.OPEN&&p.ws!==except)p.ws.send(s);
+}
+function lobbyState(){
+  return {t:'lobby',host:hostId,players:[...players.values()].map(q=>({id:q.id,name:q.name}))};
 }
 function newRound(){
   for(const q of players.values()){q.dmg=0;q.fans=0;q.kos=0;}
@@ -277,8 +281,9 @@ wss.on('connection',ws=>{
   const id=nextId++;
   const p={ws,id,name:'FAN '+id,phrase:'HAVE THAT!',x:25,z:34,yaw:Math.PI*0.75,down:0,drag:0,w:0,dmg:0,fans:0,kos:0};
   players.set(id,p);
+  if(hostId===null)hostId=id;
   ws.send(JSON.stringify({
-    t:'welcome',id,seed:roundSeed,tick,rt:roundTick,
+    t:'welcome',id,phase,host:hostId,seed:roundSeed,tick,rt:roundTick,
     stag:stagIndex>=0?{idx:stagIndex,x:C.x[stagIndex],z:C.z[stagIndex],hits:stagHits}:null,
     due:Math.max(0,stagDue-Date.now()),
     players:[...players.values()].filter(q=>q!==p).map(q=>({id:q.id,name:q.name,phrase:q.phrase,x:q.x,z:q.z,yaw:q.yaw,down:q.down,drag:q.drag})),
@@ -289,6 +294,9 @@ wss.on('connection',ws=>{
       p.name=String(m.name||'FAN '+id).slice(0,12);
       p.phrase=String(m.phrase||'HAVE THAT!').slice(0,16).toUpperCase();
       bcast({t:'pjoin',id,name:p.name,phrase:p.phrase},ws);
+      bcast(lobbyState());
+    }else if(m.t==='start'){
+      if(phase==='lobby'&&id===hostId){phase='playing';newRound();console.log('host',p.name,'kicked off');}
     }else if(m.t==='state'){
       const nx=+m.x,nz=+m.z;
       if(isFinite(nx)&&isFinite(nz)){
@@ -319,7 +327,14 @@ wss.on('connection',ws=>{
       else{try{ws.send(JSON.stringify({t:'jazznope'}));}catch(e){}}
     }
   });
-  ws.on('close',()=>{players.delete(id);lastHit.delete(id);bcast({t:'pleave',id});});
+  ws.on('close',()=>{
+    players.delete(id);lastHit.delete(id);bcast({t:'pleave',id});
+    if(hostId===id)hostId=players.size?players.values().next().value.id:null;
+    if(players.size===0){ /* ground empty: back to the tunnel so the next group starts fresh */
+      phase='lobby';roundOver=false;stagIndex=-1;simStagIndex=-1;roundEnd=Infinity;stagDue=Infinity;
+      console.log('ground empty - back to lobby');
+    }else if(phase==='lobby')bcast(lobbyState());
+  });
 });
 
 /* ---------- loops ---------- */
@@ -327,7 +342,7 @@ setInterval(()=>{ /* sim 20Hz */
   crowdStep();tick++;
   updateStag(CROWD_DT);
   const now=Date.now();
-  if(stagIndex<0&&!roundOver&&now>=stagDue&&players.size>0)spawnStag();
+  if(phase==='playing'&&stagIndex<0&&!roundOver&&now>=stagDue&&players.size>0)spawnStag();
   if(stagIndex>=0&&!roundOver&&now>roundEnd){
     roundOver=true;
     bcast({t:'escape',board:board(-1)});
@@ -344,5 +359,4 @@ setInterval(()=>{ /* snapshots 10Hz */
   });
 },100);
 
-newRound();
-server.listen(PORT,()=>console.log('Meadowbank open on :'+PORT));
+server.listen(PORT,()=>console.log('Meadowbank open on :'+PORT+' - waiting in the lobby'));
