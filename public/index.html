@@ -22,6 +22,7 @@
     .stat{font-size:8px;letter-spacing:1px;}
     .stat b{font-size:13px;}
     .statbar{width:54px;height:9px;margin-top:3px;}
+    #bestStat{display:none;}
     .card{padding:22px 18px;max-width:92vw;}
     #controlsHint{display:none;}
   }
@@ -30,10 +31,11 @@
     #punchBtn{width:18vw;max-width:94px;height:18vw;max-height:94px;font-size:11px;}
     #sprintBtn{width:15vw;max-width:78px;height:15vw;max-height:78px;font-size:10px;bottom:calc(6vh + min(18vw,94px) + 12px);}
     #shopBtn{top:max(8px,env(safe-area-inset-top))!important;right:max(10px,env(safe-area-inset-right))!important;padding:10px 15px!important;font-size:13px!important;}
-    #topbar{gap:6px 10px;padding:5px 8px;top:max(8px,env(safe-area-inset-top));}
-    .stat{font-size:8px;letter-spacing:1px;}
+    #topbar{gap:6px 10px;padding:5px 8px;top:max(8px,env(safe-area-inset-top));flex-wrap:nowrap;}
+    .stat{font-size:8px;letter-spacing:1px;white-space:nowrap;}
     .stat b{font-size:13px;}
     .statbar{width:54px;height:9px;margin-top:3px;}
+    #bestStat{display:none;}
     .card{max-width:min(540px,92vw);max-height:88vh;overflow-y:auto;padding:clamp(14px,4vw,32px) clamp(14px,4vw,36px);}
     .card h1{font-size:24px;}
   }
@@ -106,7 +108,7 @@
   <div id="topbar">
     <div class="stat">🐓<b class="stag" id="staghp">—</b></div>
     <div class="stat">This hunt<b id="timer">0:00</b></div>
-    <div class="stat">Best full-time<b id="best">—</b></div>
+    <div class="stat" id="bestStat">Best full-time<b id="best">—</b></div>
     <div class="stat">HP<div class="statbar"><div id="hpbar" style="height:100%;width:100%;background:linear-gradient(90deg,#3f9143,#7ed884);border-radius:5px;transition:width .15s;"></div></div></div>
     <div class="stat">Lives <b id="livesEl" style="color:#ff8a8a;">❤❤</b></div>
     <div class="stat">🪙<b id="coinsEl" style="color:#ffd76a;">0</b></div>
