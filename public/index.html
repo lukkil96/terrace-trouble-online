@@ -2062,8 +2062,14 @@ let beaconT=0,beaconNext=0;
 
 /* ============ mode + network ============ */
 let MODE='solo';
-const net={ws:null,id:0,seed:(Math.random()*0xffffffff)>>>0,rt:0,ready:false,host:0,inLobby:false,
+const net={ws:null,id:0,seed:(Math.random()*0xffffffff)>>>0,rt:0,ready:false,host:0,inLobby:false,waiting:false,
   send(o){if(MODE==='online'&&this.ws&&this.ws.readyState===1)this.ws.send(JSON.stringify(o));}};
+function renderWaiting(){
+  document.getElementById('lobbyCount').textContent='Match in progress';
+  document.getElementById('lobbyList').innerHTML='The lads are out there scrapping right now.<br>You’ll be on at the next kick-off.';
+  document.getElementById('lobbyStartBtn').style.display='none';
+  document.getElementById('lobbyNote').textContent='Hold tight — rounds last five minutes at most.';
+}
 function renderLobby(list,host){
   const names=list.map(q=>(q.id===host?'🧢 ':'')+q.name+(q.id===net.id?' (you)':''));
   document.getElementById('lobbyCount').textContent=list.length+(list.length===1?' in the ground':' in the ground');
@@ -2101,6 +2107,7 @@ function netHandle(m){
     if(m.players)m.players.forEach(q=>{const r=makeRemote(q.name);Object.assign(r,{x:q.x,z:q.z,tx:q.x,tz:q.z,yaw:q.yaw,tyaw:q.yaw,phrase:q.phrase});remotes.set(q.id,r);});
     net.host=m.host||0;
     if(m.phase==='lobby'){net.inLobby=true;} /* hold in the tunnel until the host starts */
+    else if(m.phase==='waiting'){net.inLobby=true;net.waiting=true;} /* match running: on at next kick-off */
     else beginMatch(m.due!=null?m.due:60000,m.stag);
   }else if(m.t==='snap'){
     snapTick=m.tick;snapTime=performance.now();
@@ -2125,18 +2132,28 @@ function netHandle(m){
       }
     });
   }else if(m.t==='pjoin'){
-    if(!remotes.has(m.id))remotes.set(m.id,makeRemote(m.name));
+    const old=remotes.get(m.id);
+    if(old&&old.name!==m.name){ /* model was built before their real name arrived: rebuild */
+      scene.remove(old.mesh);if(old.jazz)scene.remove(old.jazz);remotes.delete(m.id);
+    }
+    if(!remotes.has(m.id)){
+      const nr=makeRemote(m.name);
+      if(old)Object.assign(nr,{x:old.x,z:old.z,tx:old.tx,tz:old.tz,yaw:old.yaw,tyaw:old.tyaw});
+      nr.phrase=m.phrase||nr.phrase;
+      remotes.set(m.id,nr);
+    }
     say(m.name+' is in the ground.');
   }else if(m.t==='pleave'){
     const r=remotes.get(m.id);
     if(r){scene.remove(r.mesh);if(r.jazz)scene.remove(r.jazz);remotes.delete(m.id);}
   }else if(m.t==='lobby'){
     net.lobbyRoster=m.players||[];net.host=m.host||0;
-    if(net.inLobby)renderLobby(net.lobbyRoster,net.host);
+    if(net.waiting&&net.lobbyRoster.some(q=>q.id===net.id))net.waiting=false; /* promoted from tunnel to lobby */
+    if(net.inLobby){if(net.waiting)renderWaiting();else renderLobby(net.lobbyRoster,net.host);}
   }else if(m.t==='round'){
     net.seed=m.seed;net.rt=m.rt||0;
-    if(net.inLobby){ /* host kicked off: leave the tunnel and run the full kick-off cutscene */
-      net.inLobby=false;
+    if(net.inLobby){ /* kick-off: leave the tunnel and run the full cutscene */
+      net.inLobby=false;net.waiting=false;
       document.getElementById('lobby').style.display='none';
       hud.style.display='block';
       beginMatch(m.due!=null?m.due:60000,null);
@@ -3360,7 +3377,8 @@ document.getElementById('onlineBtn').addEventListener('click',()=>{
       document.getElementById('intro').style.display='none';
       if(net.inLobby){
         document.getElementById('lobby').style.display='flex';
-        renderLobby(net.lobbyRoster||[{id:net.id,name:playerName}],net.host);
+        if(net.waiting)renderWaiting();
+        else renderLobby(net.lobbyRoster||[{id:net.id,name:playerName}],net.host);
       }else hud.style.display='block';
     }
   },120);
